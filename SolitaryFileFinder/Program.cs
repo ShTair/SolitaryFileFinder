@@ -46,8 +46,8 @@ namespace SolitaryFileFinder
             foreach (var root in p.RootFiles)
             {
                 var rootUri = new Uri(baseUri, root);
-                _findPath.Add(rootUri.LocalPath);
-                _existsPathes.Remove(rootUri.LocalPath);
+                _findPath.Add(rootUri.LocalPath.ToLower());
+                _existsPathes.Remove(rootUri.LocalPath.ToLower());
                 _checkQueue.Enqueue(rootUri);
             }
 
@@ -89,7 +89,7 @@ namespace SolitaryFileFinder
                     var su = new Uri(targetUri, s);
                     if (su.Host != "temp") continue;
 
-                    var lp = su.LocalPath;
+                    var lp = su.LocalPath.ToLower();
                     if (_findPath.Add(lp))
                     {
                         _existsPathes.Remove(lp);
@@ -117,9 +117,11 @@ namespace SolitaryFileFinder
                 var name = Path.GetFileName(path);
                 var cu = new Uri(uri, name);
 
-                if (ignores.Contains(cu.LocalPath)) continue;
+                var lp = cu.LocalPath.ToLower();
 
-                _existsPathes.Add(cu.LocalPath);
+                if (ignores.Contains(lp)) continue;
+
+                _existsPathes.Add(lp);
             }
 
             foreach (var path in Directory.EnumerateDirectories(dir))
@@ -127,7 +129,9 @@ namespace SolitaryFileFinder
                 var name = Path.GetFileName(path);
                 var cu = new Uri(uri, name + "/");
 
-                if (ignores.Contains(cu.LocalPath)) continue;
+                var lp = cu.LocalPath.ToLower();
+
+                if (ignores.Contains(lp)) continue;
 
                 FindAll(path, cu, ignores);
             }
