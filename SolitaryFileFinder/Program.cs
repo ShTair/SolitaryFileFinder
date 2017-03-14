@@ -10,7 +10,8 @@ namespace SolitaryFileFinder
 {
     class Program
     {
-        private static Regex _h1 = new Regex(@"(?<=href="").+?(?="")");
+        private static Regex _ref1 = new Regex(@"(?<=href="").+?(?="")");
+        private static Regex _ref2 = new Regex(@"(?<=src="").+?(?="")");
 
         static void Main(string[] args)
         {
@@ -20,8 +21,8 @@ namespace SolitaryFileFinder
             Console.ReadLine();
         }
 
-        private static Queue<Uri> _q = new Queue<Uri>();
-        private static HashSet<string> _lp = new HashSet<string>();
+        private static Queue<Uri> _checkQueue = new Queue<Uri>();
+        private static HashSet<string> _findPath = new HashSet<string>();
 
         private static async Task Run(string pp)
         {
@@ -35,85 +36,79 @@ namespace SolitaryFileFinder
                 return;
             }
 
-            var b = new Uri("http://temp/");
-            var u = new Uri(b, "index.html");
+            var baseUri = new Uri("http://temp/");
 
-            _lp.Add(u.LocalPath);
-            _q.Enqueue(u);
+            foreach (var root in p.RootFiles)
+            {
+                var rootUri = new Uri(baseUri, root);
+                _findPath.Add(rootUri.LocalPath);
+                _checkQueue.Enqueue(rootUri);
+            }
 
-            var cpt = p.CheckPatterns.Select(t => new Regex(t));
+            var checkPatterns = p.CheckPatterns.Select(t => new Regex(t));
 
             while (true)
             {
-                if (_q.Count == 0) break;
-                var tgu = _q.Dequeue();
-                IEnumerable<string> s = null;
-                if (tgu.LocalPath[tgu.LocalPath.Length - 1] != '/')
+                if (_checkQueue.Count == 0) break;
+                var targetUri = _checkQueue.Dequeue();
+
+                IEnumerable<string> refPathes = null;
+                if (targetUri.LocalPath[targetUri.LocalPath.Length - 1] != '/')
                 {
-                    var tp = tgu.ToPath(p.Path);
-                    if (!cpt.Any(t => t.Match(Path.GetFileName(tp)).Success))
-                    {
-                        continue;
-                    }
-                    try
-                    {
-                        s = await Get(tp);
-                    }
-                    catch
-                    {
-                        continue;
-                    }
+                    var tp = targetUri.ToPath(p.Path);
+                    if (!checkPatterns.Any(t => t.Match(Path.GetFileName(tp)).Success)) continue;
+
+                    try { refPathes = await LoadRefPathes(tp); }
+                    catch { continue; }
                 }
                 else
                 {
-                    foreach (var ai in p.DefaultNames)
+                    foreach (var defaultName in p.DefaultNames)
                     {
-                        var r = new Uri(tgu, ai);
-                        var ppo = r.ToPath(p.Path);
-                        if (File.Exists(ppo))
+                        var nextUri = new Uri(targetUri, defaultName);
+                        var nextPath = nextUri.ToPath(p.Path);
+                        if (File.Exists(nextPath))
                         {
-                            s = await Get(ppo);
+                            refPathes = await LoadRefPathes(nextPath);
                             break;
                         }
                     }
-                    if (s == null) s = Enumerable.Empty<string>();
+                    if (refPathes == null) refPathes = Enumerable.Empty<string>();
                 }
 
-                foreach (var su in s.Select(t => new Uri(tgu, t)))
+                foreach (var su in refPathes.Select(t => new Uri(targetUri, t)).Where(t => t.Host == "temp"))
                 {
-                    if (su.Host != "temp") continue;
-
                     var lp = su.LocalPath;
-                    if (_lp.Add(lp))
+                    if (_findPath.Add(lp))
                     {
-                        _q.Enqueue(su);
+                        _checkQueue.Enqueue(su);
                     }
                 }
             }
         }
 
-        private static async Task<IEnumerable<string>> Get(string path)
+        private static async Task<IEnumerable<string>> LoadRefPathes(string path)
         {
-            using (var a = File.OpenText(path))
+            using (var reader = File.OpenText(path))
             {
-                var str = await a.ReadToEndAsync();
-                return PS(str);
+                var data = await reader.ReadToEndAsync();
+                return FindRefPathes(data);
             }
         }
 
-        private static IEnumerable<string> PS(string data)
+        private static IEnumerable<string> FindRefPathes(string data)
         {
-            var ms = _h1.Matches(data);
+            var ms = _ref1.Matches(data);
             foreach (Match m in ms) yield return m.Value;
         }
     }
 
     static class Extensions
     {
-        public static string ToPath(this Uri uri, string b)
+        public static string ToPath(this Uri uri, string dir)
         {
             var a = uri.LocalPath;
-            return b + a.Replace('/', '\\');
+            return dir + a.Replace('/', '\\');
         }
     }
 }
