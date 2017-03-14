@@ -12,6 +12,7 @@ namespace SolitaryFileFinder
     {
         private static Regex _ref1 = new Regex(@"(?<=href="").+?(?="")");
         private static Regex _ref2 = new Regex(@"(?<=src="").+?(?="")");
+        private static Regex _ref3 = new Regex(@"(?<=virtual="").+?(?="")");
 
         static void Main(string[] args)
         {
@@ -39,12 +40,13 @@ namespace SolitaryFileFinder
 
             var baseUri = new Uri("http://temp/");
 
-            FindAll(p.Path, baseUri);
+            FindAll(p.Path, baseUri, p.IgnorePaths);
 
             foreach (var root in p.RootFiles)
             {
                 var rootUri = new Uri(baseUri, root);
                 _findPath.Add(rootUri.LocalPath);
+                _existsPathes.Remove(rootUri.LocalPath);
                 _checkQueue.Enqueue(rootUri);
             }
 
@@ -79,8 +81,13 @@ namespace SolitaryFileFinder
                     if (refPathes == null) refPathes = Enumerable.Empty<string>();
                 }
 
-                foreach (var su in refPathes.Select(t => new Uri(targetUri, t)).Where(t => t.Host == "temp"))
+                foreach (var s in refPathes)
                 {
+                    if (s.StartsWith("mailto:")) continue;
+
+                    var su = new Uri(targetUri, s);
+                    if (su.Host != "temp") continue;
+
                     var lp = su.LocalPath;
                     if (_findPath.Add(lp))
                     {
@@ -89,15 +96,26 @@ namespace SolitaryFileFinder
                     }
                 }
             }
+
+            using (var writer = File.CreateText("out.txt"))
+            {
+                foreach (var item in _existsPathes)
+                {
+                    await writer.WriteLineAsync(item);
+                }
+            }
         }
 
-        private static void FindAll(string dir, Uri uri)
+        private static void FindAll(string dir, Uri uri, List<string> ignores)
         {
             foreach (var path in Directory.EnumerateDirectories(dir))
             {
                 var name = Path.GetFileName(path);
                 var cu = new Uri(uri, name + "/");
-                FindAll(path, cu);
+
+                if (ignores.Contains(cu.LocalPath)) continue;
+
+                FindAll(path, cu, ignores);
             }
 
             foreach (var path in Directory.EnumerateFiles(dir))
@@ -119,8 +137,11 @@ namespace SolitaryFileFinder
 
         private static IEnumerable<string> FindRefPathes(string data)
         {
-            var ms = _ref1.Matches(data);
-            foreach (Match m in ms) yield return m.Value;
+            foreach (Match m in _ref1.Matches(data)) yield return m.Value;
+
+            foreach (Match m in _ref2.Matches(data)) yield return m.Value;
+
+            foreach (Match m in _ref3.Matches(data)) yield return m.Value;
         }
     }
 
