@@ -153,6 +153,8 @@ namespace SolitaryFileFinder
             foreach (Match m in _ref2.Matches(data)) yield return m.Value;
 
             foreach (Match m in _ref3.Matches(data)) yield return m.Value;
+
+            foreach (Match m in _ref4.Matches(data)) yield return m.Value;
         }
     }
 
