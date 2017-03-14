@@ -23,6 +23,7 @@ namespace SolitaryFileFinder
 
         private static Queue<Uri> _checkQueue = new Queue<Uri>();
         private static HashSet<string> _findPath = new HashSet<string>();
+        private static HashSet<string> _existsPathes = new HashSet<string>();
 
         private static async Task Run(string pp)
         {
@@ -37,6 +38,8 @@ namespace SolitaryFileFinder
             }
 
             var baseUri = new Uri("http://temp/");
+
+            FindAll(p.Path, baseUri);
 
             foreach (var root in p.RootFiles)
             {
@@ -81,9 +84,27 @@ namespace SolitaryFileFinder
                     var lp = su.LocalPath;
                     if (_findPath.Add(lp))
                     {
+                        _existsPathes.Remove(lp);
                         _checkQueue.Enqueue(su);
                     }
                 }
+            }
+        }
+
+        private static void FindAll(string dir, Uri uri)
+        {
+            foreach (var path in Directory.EnumerateDirectories(dir))
+            {
+                var name = Path.GetFileName(path);
+                var cu = new Uri(uri, name + "/");
+                FindAll(path, cu);
+            }
+
+            foreach (var path in Directory.EnumerateFiles(dir))
+            {
+                var name = Path.GetFileName(path);
+                var cu = new Uri(uri, name);
+                _existsPathes.Add(cu.LocalPath);
             }
         }
 
