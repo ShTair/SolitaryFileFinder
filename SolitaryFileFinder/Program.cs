@@ -13,6 +13,7 @@ namespace SolitaryFileFinder
         private static Regex _ref1 = new Regex(@"(?<=href="").+?(?="")");
         private static Regex _ref2 = new Regex(@"(?<=src="").+?(?="")");
         private static Regex _ref3 = new Regex(@"(?<=virtual="").+?(?="")");
+        private static Regex _ref4 = new Regex(@"(?<=url\().+?(?=\))");
 
         static void Main(string[] args)
         {
@@ -50,7 +51,7 @@ namespace SolitaryFileFinder
                 _checkQueue.Enqueue(rootUri);
             }
 
-            var checkPatterns = p.CheckPatterns.Select(t => new Regex(t));
+            var checkPatterns = p.CheckPatterns.Select(t => new Regex(t)).ToArray();
 
             while (true)
             {
@@ -99,8 +100,11 @@ namespace SolitaryFileFinder
 
             using (var writer = File.CreateText("out.txt"))
             {
+                var ips = p.IgnorePatterns.Select(t => new Regex(t)).ToArray();
+
                 foreach (var item in _existsPathes)
                 {
+                    if (ips.Any(t => t.Match(item).Success)) continue;
                     await writer.WriteLineAsync(item);
                 }
             }
@@ -108,6 +112,16 @@ namespace SolitaryFileFinder
 
         private static void FindAll(string dir, Uri uri, List<string> ignores)
         {
+            foreach (var path in Directory.EnumerateFiles(dir))
+            {
+                var name = Path.GetFileName(path);
+                var cu = new Uri(uri, name);
+
+                if (ignores.Contains(cu.LocalPath)) continue;
+
+                _existsPathes.Add(cu.LocalPath);
+            }
+
             foreach (var path in Directory.EnumerateDirectories(dir))
             {
                 var name = Path.GetFileName(path);
@@ -116,13 +130,6 @@ namespace SolitaryFileFinder
                 if (ignores.Contains(cu.LocalPath)) continue;
 
                 FindAll(path, cu, ignores);
-            }
-
-            foreach (var path in Directory.EnumerateFiles(dir))
-            {
-                var name = Path.GetFileName(path);
-                var cu = new Uri(uri, name);
-                _existsPathes.Add(cu.LocalPath);
             }
         }
 
